@@ -1,0 +1,11 @@
+//terrain unit draw data
+struct UnitData
+{
+	float4 position;
+	int2 textureUV;
+	int type;
+};
+
+
+
+

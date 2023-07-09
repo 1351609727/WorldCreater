@@ -1,0 +1,39 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+#include "TerrainInput.compute"
+RWStructuredBuffer<UnitData> terrainDrawBuffer;
+RWTexture2D<float> renderTexture;
+float unitSize;
+AppendStructuredBuffer<float3> flatTerrainQuadBuffer;
+
+StructuredBuffer<int> drawArgs; //terrainUnitCount 0:Count of active terrain unit
+
+
+[numthreads(64,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	if(id.x >= drawArgs[0])
+		return;
+
+	UnitData unitData = terrainDrawBuffer[id.x];
+	int2 uv = unitData.textureUV;
+	float value = renderTexture[uv];
+
+
+	// 3  2
+	// 0  1
+	float vertexValue[4];
+	vertexValue[0] = 2;
+	vertexValue[1] = clamp(renderTexture[uv + float2(1.5, 0.5)] - value + 2, 0.0, 4.0);
+	vertexValue[2] = clamp(renderTexture[uv + float2(1.5, 1.5)] - value + 2, 0.0, 4.0);
+	vertexValue[3] = clamp(renderTexture[uv + float2(0.5, 1.5)] - value + 2, 0.0, 4.0);
+	int type = vertexValue[1] + vertexValue[2] * 5.0 + vertexValue[3] * 25.0;
+	terrainDrawBuffer[id.x].type = (int)6.0 * type;
+
+	//flat quad 2 * 25 + 2 * 5 + 2
+	if(abs(type - 62.0) < 0.2)
+	{
+		flatTerrainQuadBuffer.Append(unitData.position + 0.5 * unitSize);
+	}
+}

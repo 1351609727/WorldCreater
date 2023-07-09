@@ -1,0 +1,109 @@
+#pragma kernel CSMain
+
+#include "TerrainInput.compute"
+
+RWTexture2D<float> renderTexture;
+AppendStructuredBuffer<UnitData> terrainDrawBuffer;
+float4 renderTextureActiveSize;
+float4 planes[6]; 
+float3 srcPosition; //the min position of render texture
+float3 cameraPosition;
+float4x4 _VPMatrix;
+float maxLevel;
+float levelHeight;
+float unitSize; 
+
+bool IsOutsideThePlane(float4 plane, float3 pointPosition)
+{
+    if(dot(plane.xyz, pointPosition) + plane.w > 0)
+        return true;
+    return false;
+}
+
+bool BoundVisual (float3 position, float3 size)
+{
+    float3 minPos = position;
+    float3 maxPos = position + size;
+    float minHeight = position.y;
+    float maxHeight = position.y + size.y;
+    float4 boundVerts[8];
+    boundVerts[0] = float4(minPos.x, minHeight, minPos.z, 1);
+    boundVerts[1] = float4(minPos.x, minHeight, maxPos.z, 1);
+    boundVerts[2] = float4(maxPos.x, minHeight, minPos.z, 1);
+    boundVerts[3] = float4(maxPos.x, minHeight, maxPos.z, 1);
+    boundVerts[4] = float4(minPos.x, maxHeight, minPos.z, 1);
+    boundVerts[5] = float4(minPos.x, maxHeight, maxPos.z, 1);
+    boundVerts[6] = float4(maxPos.x, maxHeight, minPos.z, 1);
+    boundVerts[7] = float4(maxPos.x, maxHeight, maxPos.z, 1);
+
+	 for (int i = 0; i < 6; i++)
+    {
+		for(int j = 0; j < 8; j++)
+		{
+			float3 boundPosition = boundVerts[j].xyz;
+
+			if(!IsOutsideThePlane(planes[i], boundPosition))
+			break;
+			if(j == 7)
+			{
+				return false;
+			}
+		}
+    }
+
+	return true;
+}
+
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	if(id.x * 2.0 >= renderTextureActiveSize.x || id.y * 2.0 >= renderTextureActiveSize.y)
+		return;
+	
+    int2 startIndex = id.xy * 2;
+	float4 heightIndices = 0.0;
+	heightIndices.x = renderTexture[startIndex].x;
+	heightIndices.y = renderTexture[startIndex + int2(1, 0)].x;
+	heightIndices.z = renderTexture[startIndex + int2(1, 1)].x;
+	heightIndices.w = renderTexture[startIndex + int2(0, 1)].x;
+	
+	float minHeightIndex = min(heightIndices.x, min(heightIndices.y, min(heightIndices.z, heightIndices.w))) - 1.0;
+	float maxHeightIndex = max(heightIndices.x, max(heightIndices.y, max(heightIndices.z, heightIndices.w))) + 1.0;
+
+	float heightIndexDelta = maxHeightIndex - minHeightIndex;
+
+	float minHeight = minHeightIndex * levelHeight;	
+	float maxHeight = maxHeightIndex * levelHeight;
+
+	float2 startPositionXZ = float2(startIndex.x * unitSize + srcPosition.x, startIndex.y * unitSize + srcPosition.z);
+
+	float3 position = float3(startPositionXZ.x, minHeight, startPositionXZ.y);
+	float3 size = float3(unitSize * 2.0, maxHeight - minHeight, unitSize * 2.0);
+
+	if(BoundVisual(position, size))
+	{
+		UnitData unit0, unit1, unit2, unit3;
+		unit0.position = float4(startPositionXZ.x, heightIndices.x * levelHeight, startPositionXZ.y, 1);
+		unit0.textureUV = startIndex;
+		unit0.type = 0;
+		terrainDrawBuffer.Append(unit0);
+		unit1.position = float4(startPositionXZ.x + unitSize, heightIndices.y * levelHeight, startPositionXZ.y, 1);
+		unit1.textureUV = startIndex + int2(1, 0);
+		unit1.type = 0;
+		terrainDrawBuffer.Append(unit1);
+		unit2.position = float4(startPositionXZ.x + unitSize, heightIndices.z * levelHeight, startPositionXZ.y + unitSize, 1);
+		unit2.textureUV = startIndex + int2(1, 1);
+		unit2.type = 0;
+		terrainDrawBuffer.Append(unit2);
+		unit3.position = float4(startPositionXZ.x, heightIndices.w * levelHeight, startPositionXZ.y + unitSize, 1);
+		unit3.textureUV = startIndex + int2(0, 1);
+		unit3.type = 0;
+		terrainDrawBuffer.Append(unit3);
+	}
+}
+
+
+
+
+

@@ -1,0 +1,13 @@
+#pragma kernel CSMain
+
+float4 targetValue;
+RWTexture2D<float> renderTexture;
+
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	renderTexture[id.xy] = targetValue;
+}
+
+

@@ -1,0 +1,46 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+#include "ProgramNoise.compute"
+
+struct ObjDrawData
+{
+	float3 position;
+	float sinRotY;
+	float cosRotY;
+};
+
+StructuredBuffer<float3> flatTerrainQuadBuffer;
+AppendStructuredBuffer<ObjDrawData> Obj0Buffer;
+AppendStructuredBuffer<ObjDrawData> Obj1Buffer;
+AppendStructuredBuffer<ObjDrawData> Obj2Buffer;
+float3 scaleRandom;
+float3 appearRate;
+
+
+[numthreads(64,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	float3 position = flatTerrainQuadBuffer[id.x];
+	if(position.y <= 27)
+		return;
+	float value = hash22(float2(position.xz)) + 1;
+	ObjDrawData drawData;
+	drawData.position = position;
+	drawData.sinRotY = sin(value * 6.28);
+	drawData.cosRotY = cos(value * 6.28);
+	value *= 3.2;
+	value = floor(value);
+	if(value - 0.1 < 0)
+	{
+		Obj0Buffer.Append(drawData);
+	}
+	else if(value - 0.1 < 1)
+	{
+		Obj1Buffer.Append(drawData);
+	}
+	else if(value - 0.1 < 2)
+	{
+		Obj2Buffer.Append(drawData);
+	}
+}

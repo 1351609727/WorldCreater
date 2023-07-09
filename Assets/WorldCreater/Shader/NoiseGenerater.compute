@@ -1,0 +1,30 @@
+#pragma kernel CSMain
+#include"ProgramNoise.compute"
+
+float maxLevel;
+//x: axisX min y: axisY min
+float4 minUnitID;
+float4 perlinNoiseArgs;
+float4 simplexNoiseArgs;
+RWTexture2D<float> renderTexture;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	float heightUnit = 1.0 / maxLevel;
+	float2 index = id.xy + minUnitID.xy;
+	float perlinValue = Perlin(index * perlinNoiseArgs.x * 0.01) * 0.5 + 0.5 ;
+	perlinValue = pow(perlinValue, perlinNoiseArgs.z) * perlinNoiseArgs.y;
+	float simplexSumValue = SimplexSum(index * simplexNoiseArgs.x * 0.0001) * 0.5 + 0.5;
+	simplexSumValue = pow(simplexSumValue, simplexNoiseArgs.z) * simplexNoiseArgs.y;
+	
+	float r =  perlinValue + simplexSumValue;
+	r = floor(r / (heightUnit * 2.0));
+	renderTexture[id.xy] = r;
+    return;
+}
+
+
+
+
+
